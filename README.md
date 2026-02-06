@@ -13,6 +13,20 @@
 - Works on Linux, macOS, and Windows — no native SSH client required
 - Zero required configuration — credentials provided per-connection
 
+## Prerequisites
+
+Before installing, ensure you have:
+
+1. **Node.js 18 or newer**
+   - Check: `node --version`
+   - Linux/macOS: [nodejs.org](https://nodejs.org) or your package manager
+   - Windows: `winget install OpenJS.NodeJS.LTS` or download from [nodejs.org](https://nodejs.org)
+   - After installing Node.js, **restart your terminal/editor**
+
+2. **For Claude Code (CLI or VS Code extension) users:**
+   - Claude Code CLI installed globally: `npm install -g @anthropic-ai/claude-code`
+   - Check: `claude --version`
+
 ## How it works
 
 This server uses the [ssh2](https://github.com/mscdex/ssh2) library (pure JavaScript) for all SSH operations. No native SSH binary is needed — it works identically across all platforms.
@@ -24,11 +38,17 @@ This server uses the [ssh2](https://github.com/mscdex/ssh2) library (pure JavaSc
 3. Runs commands with `ssh_exec`, transfers files with `sftp_*` tools
 4. Connection stays open until `ssh_disconnect` or 30 min idle timeout
 
-## Requirements
-
-- Node.js 18 or newer
+> **Important:** All commands executed via `ssh_exec` must be non-interactive. Do NOT run commands that require user input (e.g. `apt upgrade` without `-y`, interactive editors like `vim` or `nano`, `passwd` without piping input). Always use non-interactive flags: `apt install -y`, `DEBIAN_FRONTEND=noninteractive`, `yes |`, etc.
 
 ## Getting started
+
+Choose your environment:
+
+- [Claude Code (CLI)](#claude-code) — Terminal-based AI coding
+- [Claude Code for VS Code](#claude-code-for-vs-code-extension) — VS Code extension
+- [Claude Desktop](#claude-desktop) — Desktop app
+- [VS Code with GitHub Copilot](#vs-code-with-github-copilot) — Copilot agent mode
+- [Cline](#cline) / [Cursor](#cursor) / [Windsurf](#windsurf) / [Roo Code](#roo-code) / [Codex](#codex) — Other clients
 
 The standard config works across most MCP clients:
 
@@ -51,6 +71,33 @@ No environment variables are required. Authentication is provided per-connection
 ```bash
 claude mcp add ssh -- npx -y mcp-server-ssh
 ```
+
+</details>
+
+<details>
+<summary>Claude Code for VS Code Extension</summary>
+
+> This section is for the **Claude Code VS Code extension**, not GitHub Copilot. If you use VS Code with GitHub Copilot, see the [VS Code with GitHub Copilot](#vs-code-with-github-copilot) section instead.
+
+**Step 1:** Install Claude Code CLI globally (required for the extension):
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+**Step 2:** Add the MCP server via CLI:
+
+```bash
+claude mcp add ssh -- npx -y mcp-server-ssh
+```
+
+**Step 3:** Restart VS Code completely (Ctrl+Shift+P > "Reload Window" or close and reopen).
+
+**Step 4:** Verify by asking Claude: *"List SSH connections"*
+
+> **Windows users:** Use PowerShell or CMD (not Git Bash) when running `claude mcp add` commands.
+
+> The `code --add-mcp` command does **NOT** work with Claude Code extension — that's for VS Code Copilot only.
 
 </details>
 
@@ -139,7 +186,7 @@ Open Roo Code MCP settings and add to `roo_mcp_settings.json`:
 </details>
 
 <details>
-<summary>VS Code (Copilot)</summary>
+<summary>VS Code with GitHub Copilot</summary>
 
 Install using the VS Code CLI:
 
@@ -149,6 +196,8 @@ code --add-mcp '{"name":"ssh","command":"npx","args":["-y","mcp-server-ssh"]}'
 
 Or add to your VS Code MCP config manually using the standard config above.
 
+> This is for **GitHub Copilot** agent mode in VS Code. For the **Claude Code** extension, see the [Claude Code for VS Code Extension](#claude-code-for-vs-code-extension) section.
+
 </details>
 
 <details>
@@ -157,6 +206,14 @@ Or add to your VS Code MCP config manually using the standard config above.
 Follow the [Windsurf MCP documentation](https://docs.windsurf.com/windsurf/mcp). Use the standard config above.
 
 </details>
+
+## Windows Users
+
+- Use **PowerShell or CMD** (not Git Bash) for `claude mcp add` commands
+- Config file location: `C:\Users\<YourUsername>\.claude.json`
+- Install Node.js: `winget install OpenJS.NodeJS.LTS` or download from [nodejs.org](https://nodejs.org)
+- After installing Node.js, **restart your terminal and VS Code**
+- SSH keys are typically at `C:\Users\<YourUsername>\.ssh\`
 
 ## Environment variables
 
@@ -171,6 +228,30 @@ All optional. Credentials are provided per-connection via tool calls.
 | `SSH_MCP_ALLOWED_HOSTS` | — | Comma-separated allowed host patterns (e.g. `*.example.com,10.0.0.*`) |
 | `SSH_MCP_MAX_FILE_SIZE` | `1048576` (1MB) | Max file size for sftp_read |
 | `SSH_MCP_EXEC_TIMEOUT` | `30000` (30s) | Default command execution timeout |
+
+## Important: Non-Interactive Commands Only
+
+All commands executed via `ssh_exec` **must be non-interactive**. The MCP server cannot handle commands that prompt for user input.
+
+**Do:**
+```bash
+apt install -y nginx                    # -y flag for automatic yes
+DEBIAN_FRONTEND=noninteractive apt upgrade -y
+echo "newpassword" | passwd --stdin user  # pipe input
+ssh-keygen -t ed25519 -f /root/.ssh/id -N ""  # empty passphrase flag
+systemctl enable --now nginx
+```
+
+**Don't:**
+```bash
+apt upgrade              # prompts for confirmation
+vim /etc/nginx.conf      # interactive editor
+passwd root              # prompts for password
+mysql_secure_installation  # interactive wizard
+top                      # interactive display
+```
+
+For long-running commands, increase the `timeout` parameter (default: 30s).
 
 ## Tools
 
@@ -245,6 +326,41 @@ AI (using mcp-server-ssh):
 4. ssh_exec("apt update && apt install -y nginx")
 5. ssh_exec("systemctl enable --now nginx")
 ```
+
+## Troubleshooting
+
+### MCP tools not appearing in Claude Code VS Code extension
+
+1. Install Claude Code CLI: `npm install -g @anthropic-ai/claude-code`
+2. Verify: `claude --version` should show a version number
+3. Add server via CLI: `claude mcp add ssh -- npx -y mcp-server-ssh`
+4. **Completely restart VS Code** (not just reload window)
+5. Check `~/.claude.json` for correct configuration
+
+### `claude: command not found`
+
+Install the Claude Code CLI globally:
+
+```bash
+npm install -g @anthropic-ai/claude-code
+```
+
+Verify your PATH includes npm global packages. On Windows, restart your terminal after installing.
+
+### `Cannot parse privateKey` error with ed25519
+
+The ssh2 library's ed25519 support requires a native addon that may not be available in all environments. Switch to ecdsa or rsa:
+
+```
+ssh_keygen(type: "ecdsa", bits: 256)
+```
+
+### Connection timeout or refused
+
+- Verify the server is reachable: `ping <host>` or `telnet <host> 22`
+- Check if SSH port is open (default: 22)
+- For newly created VPS, wait 10-30 seconds for SSH daemon to start
+- Check firewall rules on the server
 
 ## License
 
