@@ -1,0 +1,41 @@
+{
+  "name": "mcp-ssh-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP server for SSH remote access: execute commands, transfer files via SFTP, generate SSH key pairs",
+  "bin": {
+    "mcp-ssh-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "build"
+  ],
+  "repository": "github:bacarrdy/mcp-ssh-server",
+  "homepage": "https://github.com/bacarrdy/mcp-ssh-server",
+  "author": "bacarrdy",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "ssh",
+    "sftp",
+    "remote",
+    "model-context-protocol",
+    "claude",
+    "server-management",
+    "devops"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "ssh2": "^1.17.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "@types/ssh2": "^1.15.5",
+    "typescript": "^5.7.3"
+  }
+}
