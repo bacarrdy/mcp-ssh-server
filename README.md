@@ -1,4 +1,4 @@
-# mcp-ssh-server
+# mcp-server-ssh
 
 [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server for SSH remote access. Gives AI assistants the ability to execute commands, transfer files via SFTP, generate SSH key pairs, and set up port forwarding on any SSH-accessible server.
 
@@ -37,7 +37,7 @@ The standard config works across most MCP clients:
   "mcpServers": {
     "ssh": {
       "command": "npx",
-      "args": ["-y", "mcp-ssh-server"]
+      "args": ["-y", "mcp-server-ssh"]
     }
   }
 }
@@ -49,7 +49,7 @@ No environment variables are required. Authentication is provided per-connection
 <summary>Claude Code</summary>
 
 ```bash
-claude mcp add ssh -- npx -y mcp-ssh-server
+claude mcp add ssh -- npx -y mcp-server-ssh
 ```
 
 </details>
@@ -72,7 +72,7 @@ Open Cline MCP settings and add to your `cline_mcp_settings.json`:
     "ssh": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-ssh-server"],
+      "args": ["-y", "mcp-server-ssh"],
       "disabled": false
     }
   }
@@ -87,7 +87,7 @@ Open Cline MCP settings and add to your `cline_mcp_settings.json`:
 Use the Codex CLI:
 
 ```bash
-codex mcp add ssh npx "mcp-ssh-server"
+codex mcp add ssh npx "mcp-server-ssh"
 ```
 
 Or edit `~/.codex/config.toml`:
@@ -95,7 +95,7 @@ Or edit `~/.codex/config.toml`:
 ```toml
 [mcp_servers.ssh]
 command = "npx"
-args = ["mcp-ssh-server"]
+args = ["mcp-server-ssh"]
 ```
 
 </details>
@@ -103,14 +103,14 @@ args = ["mcp-ssh-server"]
 <details>
 <summary>Cursor</summary>
 
-Go to **Cursor Settings** > **MCP** > **Add new MCP Server**. Use command type with the command `npx -y mcp-ssh-server`. Or add manually to `.cursor/mcp.json`:
+Go to **Cursor Settings** > **MCP** > **Add new MCP Server**. Use command type with the command `npx -y mcp-server-ssh`. Or add manually to `.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "ssh": {
       "command": "npx",
-      "args": ["-y", "mcp-ssh-server"]
+      "args": ["-y", "mcp-server-ssh"]
     }
   }
 }
@@ -129,7 +129,7 @@ Open Roo Code MCP settings and add to `roo_mcp_settings.json`:
     "ssh": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-ssh-server"],
+      "args": ["-y", "mcp-server-ssh"],
       "disabled": false
     }
   }
@@ -144,7 +144,7 @@ Open Roo Code MCP settings and add to `roo_mcp_settings.json`:
 Install using the VS Code CLI:
 
 ```bash
-code --add-mcp '{"name":"ssh","command":"npx","args":["-y","mcp-ssh-server"]}'
+code --add-mcp '{"name":"ssh","command":"npx","args":["-y","mcp-server-ssh"]}'
 ```
 
 Or add to your VS Code MCP config manually using the standard config above.
@@ -209,7 +209,7 @@ All optional. Credentials are provided per-connection via tool calls.
 This server pairs with [vpsnet-mcp](https://github.com/bacarrdy/vpsnet-mcp) for complete VPS provisioning + configuration:
 
 1. Use **vpsnet-mcp** to order a VPS and get its IP address
-2. Use **mcp-ssh-server** to connect, install software, deploy applications
+2. Use **mcp-server-ssh** to connect, install software, deploy applications
 
 Combined config:
 
@@ -225,7 +225,7 @@ Combined config:
     },
     "ssh": {
       "command": "npx",
-      "args": ["-y", "mcp-ssh-server"]
+      "args": ["-y", "mcp-server-ssh"]
     }
   }
 }
@@ -240,7 +240,7 @@ AI (using vpsnet-mcp):
 1. get_order_plans → pick a plan
 2. order_service → get VPS IP
 
-AI (using mcp-ssh-server):
+AI (using mcp-server-ssh):
 3. ssh_connect(host: "185.x.x.x", username: "root", password: "...")
 4. ssh_exec("apt update && apt install -y nginx")
 5. ssh_exec("systemctl enable --now nginx")

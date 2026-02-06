@@ -15,7 +15,7 @@ import * as sftp from "./sftp.js";
 import { generateKeyPair } from "./keygen.js";
 
 const server = new McpServer(
-  { name: "mcp-ssh-server", version: "1.0.0" },
+  { name: "mcp-server-ssh", version: "1.0.0" },
   {
     instructions: [
       "This MCP server provides SSH remote access: execute commands, transfer files via SFTP, and generate SSH key pairs.",
@@ -88,7 +88,7 @@ const server = new McpServer(
       "",
       "Combined config example for Claude Desktop:",
       '  "vpsnet": { "command": "npx", "args": ["-y", "vpsnet-mcp"], "env": { "VPSNET_API_KEY": "..." } }',
-      '  "ssh": { "command": "npx", "args": ["-y", "mcp-ssh-server"] }',
+      '  "ssh": { "command": "npx", "args": ["-y", "mcp-server-ssh"] }',
     ].join("\n"),
   }
 );

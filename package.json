@@ -1,10 +1,10 @@
 {
-  "name": "mcp-ssh-server",
+  "name": "mcp-server-ssh",
   "version": "1.0.0",
   "type": "module",
   "description": "MCP server for SSH remote access: execute commands, transfer files via SFTP, generate SSH key pairs",
   "bin": {
-    "mcp-ssh-server": "./build/index.js"
+    "mcp-server-ssh": "./build/index.js"
   },
   "scripts": {
     "build": "tsc",
