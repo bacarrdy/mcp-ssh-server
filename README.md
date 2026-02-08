@@ -134,7 +134,7 @@ Open Cline MCP settings and add to your `cline_mcp_settings.json`:
 Use the Codex CLI:
 
 ```bash
-codex mcp add ssh npx "mcp-server-ssh"
+codex mcp add ssh -- npx -y mcp-server-ssh
 ```
 
 Or edit `~/.codex/config.toml`:
@@ -142,8 +142,16 @@ Or edit `~/.codex/config.toml`:
 ```toml
 [mcp_servers.ssh]
 command = "npx"
-args = ["mcp-server-ssh"]
+args = ["-y", "mcp-server-ssh"]
 ```
+
+**If your system's default Node.js is older than 18** (common with nvm — check with `node --version`), wrap the command so nvm loads the right version:
+
+```bash
+codex mcp add ssh -- bash -lc 'source ~/.nvm/nvm.sh >/dev/null 2>&1 && nvm use --silent 20 && npx -y mcp-server-ssh'
+```
+
+> **Note:** Codex requires network access to install packages via npx. If you run Codex in a restricted sandbox without network, npx installs will fail.
 
 </details>
 
@@ -285,6 +293,8 @@ For long-running commands, increase the `timeout` parameter (default: 30s).
 | `ssh_keygen` | Generate key pair (ed25519/rsa/ecdsa). Returns keys as strings, does NOT save to disk. For use with ssh_connect, prefer ecdsa/rsa |
 | `ssh_port_forward` | Create local or remote TCP port tunnel |
 
+> **Port forwarding requirements:** The remote server's `sshd_config` must have `AllowTcpForwarding yes` (default on most systems). For remote forwards that listen on all interfaces, the server also needs `GatewayPorts yes` or `GatewayPorts clientspecified`.
+
 ## Pairing with vpsnet-mcp
 
 This server pairs with [vpsnet-mcp](https://github.com/bacarrdy/vpsnet-mcp) for complete VPS provisioning + configuration:
@@ -361,6 +371,13 @@ ssh_keygen(type: "ecdsa", bits: 256)
 - Check if SSH port is open (default: 22)
 - For newly created VPS, wait 10-30 seconds for SSH daemon to start
 - Check firewall rules on the server
+
+### `fetch is not defined` or startup errors
+
+This server requires **Node.js 18+**. If your default `node` is older (common with nvm setups), either:
+
+- Set Node 18+ as default: `nvm alias default 20`
+- Or use the nvm wrapper shown in the [Codex](#codex) section
 
 ## License
 
