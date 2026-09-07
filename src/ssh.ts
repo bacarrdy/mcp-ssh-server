@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ConnectionEntry, ExecResult, ForwardInfo } from "./types.js";
 import net from "node:net";
+import { hostKeyVerifier, parseHostKeyPins } from "./host-verification.js";
 
 const IDLE_TIMEOUT = parseInt(
   process.env.SSH_MCP_IDLE_TIMEOUT || "1800000",
@@ -15,6 +16,7 @@ const ALLOWED_HOSTS = process.env.SSH_MCP_ALLOWED_HOSTS
   ? process.env.SSH_MCP_ALLOWED_HOSTS.split(",").map((h) => h.trim())
   : null;
 const STRICT_HOST_CHECK = process.env.SSH_MCP_STRICT_HOST_CHECK === "true";
+const HOST_KEY_PINS = parseHostKeyPins(process.env.SSH_MCP_HOST_KEY_PINS);
 
 const connections = new Map<string, ConnectionEntry>();
 const forwards = new Map<string, ForwardInfo & { server?: net.Server }>();
@@ -98,10 +100,14 @@ export async function connect(opts: {
   const id = makeConnectionId(host, port, opts.name);
 
   checkHost(host);
+  const verifyHostKey = hostKeyVerifier(host, port, STRICT_HOST_CHECK, HOST_KEY_PINS);
 
   // Reuse existing live connection
   const existing = connections.get(id);
   if (existing) {
+    if (existing.host !== host || existing.port !== port || existing.username !== username) {
+      throw new Error(`Connection "${id}" is already in use for a different SSH target`);
+    }
     try {
       // Test if alive
       await exec(id, "echo __alive__", 5000);
@@ -185,9 +191,7 @@ export async function connect(opts: {
       return;
     }
 
-    if (!STRICT_HOST_CHECK) {
-      config.hostVerifier = () => true;
-    }
+    config.hostVerifier = verifyHostKey ?? (() => true);
 
     client.connect(config as Parameters<typeof client.connect>[0]);
   });

@@ -232,10 +232,34 @@ All optional. Credentials are provided per-connection via tool calls.
 | `SSH_MCP_DEFAULT_USERNAME` | — | Default SSH username when not specified in ssh_connect |
 | `SSH_MCP_DEFAULT_KEY` | `~/.ssh/id_ed25519` | Default private key path (auto-detects ed25519, rsa, ecdsa) |
 | `SSH_MCP_IDLE_TIMEOUT` | `1800000` (30 min) | Connection idle timeout in milliseconds |
-| `SSH_MCP_STRICT_HOST_CHECK` | `false` | Enable strict host key checking |
+| `SSH_MCP_STRICT_HOST_CHECK` | `false` | Require a trusted host key pin for every connection; missing pins reject before connecting |
+| `SSH_MCP_HOST_KEY_PINS` | — | JSON object mapping exact `host:port` targets to SHA256 fingerprints, individually or as arrays for rotation; IPv6 targets use `[address]:port` |
 | `SSH_MCP_ALLOWED_HOSTS` | — | Comma-separated allowed host patterns (e.g. `*.example.com,10.0.0.*`) |
 | `SSH_MCP_MAX_FILE_SIZE` | `1048576` (1MB) | Max file size for sftp_read |
 | `SSH_MCP_EXEC_TIMEOUT` | `30000` (30s) | Default command execution timeout |
+
+Strict host checking requires operator-configured pins before rollout. Obtain each
+fingerprint through a trusted server console or another authenticated channel,
+for example by running `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256`
+on the server. Configure the fingerprint of a host key the server offers:
+
+```json
+{
+  "SSH_MCP_STRICT_HOST_CHECK": "true",
+  "SSH_MCP_HOST_KEY_PINS": "{\"server.example.com:22\":[\"SHA256:REPLACE_WITH_VERIFIED_FINGERPRINT\"]}"
+}
+```
+
+Pins match the requested hostname or IP and port exactly; DNS names are
+case-insensitive. Add separate entries for each alias used to connect. Multiple
+pins allow planned host-key rotation. A configured pin is always enforced,
+including when strict checking is disabled; unconfigured targets are allowed only
+when strict checking is disabled. Malformed pin configuration fails closed.
+Restart the MCP server after changing pins. This pin configuration does not read
+or modify OpenSSH `known_hosts`. Existing connection names can be reused only for
+the same host, port, and username.
+If a server offers several host-key algorithms, list each permitted key's
+fingerprint or ensure the negotiated key is among the configured pins.
 
 ## Important: Non-Interactive Commands Only
 
