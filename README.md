@@ -396,6 +396,13 @@ ssh_keygen(type: "ecdsa", bits: 256)
 - For newly created VPS, wait 10-30 seconds for SSH daemon to start
 - Check firewall rules on the server
 
+### Server drops every connection at once (fixed in 1.0.3)
+
+Before 1.0.3 a forwarded socket error (for example `ssh_port_forward` type `remote` pointing at a local port with nothing
+listening, or a client reset on a `local` forward) raised an unhandled `'error'` event, Node exited, and every SSH session
+the process held was lost. 1.0.3 handles those errors per socket, cancels remote forwards on disconnect, drops a
+connection's forwards when the SSH client closes, and keeps the process alive on any stray exception (logged to stderr).
+
 ### `fetch is not defined` or startup errors
 
 This server requires **Node.js 18+**. If your default `node` is older (common with nvm setups), either:

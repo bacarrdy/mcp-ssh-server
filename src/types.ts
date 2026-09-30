@@ -14,6 +14,7 @@ export interface ExecResult {
   stdout: string;
   stderr: string;
   exitCode: number;
+  durationMs: number;
 }
 
 export interface SftpEntry {

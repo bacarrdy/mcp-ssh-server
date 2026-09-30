@@ -19,7 +19,37 @@ const STRICT_HOST_CHECK = process.env.SSH_MCP_STRICT_HOST_CHECK === "true";
 const HOST_KEY_PINS = parseHostKeyPins(process.env.SSH_MCP_HOST_KEY_PINS);
 
 const connections = new Map<string, ConnectionEntry>();
-const forwards = new Map<string, ForwardInfo & { server?: net.Server }>();
+type ForwardEntry = ForwardInfo & {
+  server?: net.Server;
+  onTcpConnection?: (...args: never[]) => void;
+};
+const forwards = new Map<string, ForwardEntry>();
+
+function closeForward(fid: string, fwd: ForwardEntry) {
+  fwd.server?.close();
+  const entry = connections.get(fwd.connectionId);
+  if (entry && fwd.type === "remote") {
+    if (fwd.onTcpConnection) {
+      entry.client.removeListener("tcp connection", fwd.onTcpConnection as never);
+    }
+    try {
+      entry.client.unforwardIn(fwd.bindAddr, fwd.bindPort, () => undefined);
+    } catch {
+      // the connection may already be gone
+    }
+  }
+  forwards.delete(fid);
+}
+
+function dropConnection(id: string) {
+  for (const [fid, fwd] of forwards) {
+    if (fwd.connectionId === id) {
+      fwd.server?.close();
+      forwards.delete(fid);
+    }
+  }
+  connections.delete(id);
+}
 let idleTimer: ReturnType<typeof setInterval> | null = null;
 
 function startIdleTimer() {
@@ -160,13 +190,13 @@ export async function connect(opts: {
 
     client.on("error", (err) => {
       clearTimeout(timeout);
-      connections.delete(id);
+      dropConnection(id);
+      // After 'ready' the promise is settled; a later error only drops the entry.
       reject(new Error(`SSH connection failed: ${err.message}`));
     });
 
-    client.on("end", () => {
-      connections.delete(id);
-    });
+    client.on("end", () => dropConnection(id));
+    client.on("close", () => dropConnection(id));
 
     const config: Record<string, unknown> = {
       host,
@@ -200,29 +230,23 @@ export async function connect(opts: {
 export async function disconnect(id?: string): Promise<string[]> {
   const closed: string[] = [];
   if (id) {
+    // Close related forwards first (a remote forward is cancelled on the client)
+    for (const [fid, fwd] of forwards) {
+      if (fwd.connectionId === id) closeForward(fid, fwd);
+    }
     const entry = connections.get(id);
     if (entry) {
       entry.client.end();
       connections.delete(id);
       closed.push(id);
     }
-    // Close related forwards
-    for (const [fid, fwd] of forwards) {
-      if (fwd.connectionId === id) {
-        fwd.server?.close();
-        forwards.delete(fid);
-      }
-    }
   } else {
+    for (const [fid, fwd] of forwards) closeForward(fid, fwd);
     for (const [cid, entry] of connections) {
       entry.client.end();
       closed.push(cid);
     }
     connections.clear();
-    for (const [fid, fwd] of forwards) {
-      fwd.server?.close();
-      forwards.delete(fid);
-    }
     forwards.clear();
   }
   return closed;
@@ -253,12 +277,35 @@ export async function exec(
 ): Promise<ExecResult> {
   const entry = touch(connectionId);
   const effectiveTimeout = timeout ?? EXEC_TIMEOUT;
+  const startedAt = Date.now();
 
   return new Promise((resolve, reject) => {
+    let channel:
+      | (import("ssh2").ClientChannel & { signal?: (sig: string) => void })
+      | null = null;
+
     const timer = setTimeout(() => {
+      const durationMs = Date.now() - startedAt;
+      // Best-effort: stop the channel to avoid background output/memory growth.
+      try {
+        channel?.signal?.("KILL");
+      } catch {
+        // ignore
+      }
+      try {
+        channel?.close();
+      } catch {
+        // ignore
+      }
+      try {
+        channel?.end();
+      } catch {
+        // ignore
+      }
+
       reject(
         new Error(
-          `Command timed out after ${effectiveTimeout}ms. Command: ${command.slice(0, 100)}`
+          `Command timed out after ${effectiveTimeout}ms (duration ${durationMs}ms). Command: ${command.slice(0, 100)}`
         )
       );
     }, effectiveTimeout);
@@ -269,6 +316,8 @@ export async function exec(
         reject(new Error(`Exec failed: ${err.message}`));
         return;
       }
+
+      channel = stream as typeof channel;
 
       let stdout = "";
       let stderr = "";
@@ -284,10 +333,12 @@ export async function exec(
       stream.on("close", (code: number | null) => {
         clearTimeout(timer);
         // Trim trailing newlines
+        const durationMs = Date.now() - startedAt;
         resolve({
           stdout: stdout.replace(/\n$/, ""),
           stderr: stderr.replace(/\n$/, ""),
           exitCode: code ?? 0,
+          durationMs,
         });
       });
 
@@ -318,6 +369,10 @@ export async function portForward(opts: {
   if (opts.type === "local") {
     // Local forward: listen locally, tunnel through SSH to dest
     const server = net.createServer((socket) => {
+      // A reset from the local client must never become an unhandled 'error'
+      // event: that would take the whole MCP process (and every SSH session it
+      // holds) down with it.
+      socket.on("error", () => socket.destroy());
       entry.client.forwardOut(
         bindAddr,
         opts.bindPort,
@@ -325,9 +380,12 @@ export async function portForward(opts: {
         opts.destPort,
         (err, stream) => {
           if (err) {
-            socket.end();
+            socket.destroy();
             return;
           }
+          stream.on("error", () => socket.destroy());
+          socket.on("close", () => stream.destroy());
+          stream.on("close", () => socket.destroy());
           socket.pipe(stream).pipe(socket);
         }
       );
@@ -338,7 +396,7 @@ export async function portForward(opts: {
       server.on("error", reject);
     });
 
-    const info: ForwardInfo & { server?: net.Server } = {
+    const info: ForwardEntry = {
       id: fwdId,
       type: "local",
       bindAddr,
@@ -359,13 +417,39 @@ export async function portForward(opts: {
       });
     });
 
-    entry.client.on("tcp connection", (details, accept) => {
-      const stream = accept();
+    const onTcpConnection = (
+      details: { destPort: number },
+      accept: () => import("ssh2").ClientChannel,
+      reject: () => void
+    ) => {
+      if (details.destPort !== opts.bindPort) return;
       const socket = net.createConnection(opts.destPort, opts.destAddr);
-      stream.pipe(socket).pipe(stream);
-    });
+      let stream: import("ssh2").ClientChannel | null = null;
+      // ECONNREFUSED on the local destination used to be an unhandled 'error'
+      // event that crashed the process and dropped every connection
+      // (2026-09-30 04:43Z). Refuse the remote connection instead.
+      socket.on("error", () => {
+        if (stream) stream.destroy();
+        else {
+          try {
+            reject();
+          } catch {
+            // ignore
+          }
+        }
+        socket.destroy();
+      });
+      socket.on("connect", () => {
+        stream = accept();
+        stream.on("error", () => socket.destroy());
+        stream.on("close", () => socket.destroy());
+        socket.on("close", () => stream?.destroy());
+        stream.pipe(socket).pipe(stream);
+      });
+    };
+    entry.client.on("tcp connection", onTcpConnection);
 
-    const info: ForwardInfo = {
+    const info: ForwardEntry = {
       id: fwdId,
       type: "remote",
       bindAddr,
@@ -373,15 +457,25 @@ export async function portForward(opts: {
       destAddr: opts.destAddr,
       destPort: opts.destPort,
       connectionId: opts.connectionId,
+      onTcpConnection,
     };
     forwards.set(fwdId, info);
-    return info;
+    return { ...info, onTcpConnection: undefined } as ForwardInfo;
   }
 }
 
 export function getConnection(id: string): ConnectionEntry {
   return touch(id);
 }
+
+// A stray error from a forwarded socket or a channel must not kill the
+// process: every SSH session lives in it. Log and carry on.
+process.on("uncaughtException", (err) => {
+  console.error(`ssh-mcp: uncaught exception (kept running): ${err?.stack || err}`);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error(`ssh-mcp: unhandled rejection (kept running): ${String(reason)}`);
+});
 
 // Cleanup on exit
 process.on("exit", () => {
