@@ -1,5 +1,3 @@
-node_modules/
-build/
 .env
 .env.*
 .envrc
@@ -18,4 +16,5 @@ id_ecdsa
 id_ed25519
 id_dsa
 .ssh/
-src/run-tests.ts
+src/
+test/

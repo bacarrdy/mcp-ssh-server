@@ -3,6 +3,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+import { readFileSync } from "node:fs";
 import {
   connect,
   disconnect,
@@ -15,7 +16,10 @@ import * as sftp from "./sftp.js";
 import { generateKeyPair } from "./keygen.js";
 
 const server = new McpServer(
-  { name: "mcp-server-ssh", version: "1.0.0" },
+  {
+    name: "mcp-server-ssh",
+    version: JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version,
+  },
   {
     instructions: [
       "This MCP server provides SSH remote access: execute commands, transfer files via SFTP, and generate SSH key pairs.",

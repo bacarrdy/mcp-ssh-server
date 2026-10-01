@@ -13,7 +13,12 @@
     "prepublishOnly": "npm run build"
   },
   "files": [
-    "build"
+    "build/index.js",
+    "build/ssh.js",
+    "build/sftp.js",
+    "build/keygen.js",
+    "build/types.js",
+    "build/host-verification.js"
   ],
   "repository": "github:bacarrdy/mcp-ssh-server",
   "homepage": "https://github.com/bacarrdy/mcp-ssh-server",
