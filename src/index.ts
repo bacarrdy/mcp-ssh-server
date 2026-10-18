@@ -495,6 +495,14 @@ server.registerTool(
 
 async function main() {
   const transport = new StdioServerTransport();
+  transport.onclose = () => process.exit(0);
+  process.stdin.on("end", () => process.exit(0));
+  process.stdin.on("close", () => process.exit(0));
+  setInterval(() => {
+    if (process.ppid === 1) {
+      process.exit(0);
+    }
+  }, 5000).unref();
   await server.connect(transport);
   console.error("SSH MCP server running");
 }

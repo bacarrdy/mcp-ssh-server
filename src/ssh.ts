@@ -468,13 +468,42 @@ export function getConnection(id: string): ConnectionEntry {
   return touch(id);
 }
 
+function isBrokenPipeError(err: unknown): boolean {
+  const code = (err as NodeJS.ErrnoException | undefined)?.code;
+  const msg = String((err as Error | undefined)?.message || err || "");
+  return code === "EPIPE" || code === "ERR_STREAM_DESTROYED" || msg.includes("EPIPE");
+}
+
+function safeStderrLog(msg: string): void {
+  try {
+    if (process.stderr && process.stderr.writable && !process.stderr.destroyed) {
+      process.stderr.write(`${msg}\n`);
+    }
+  } catch {
+    // Ignore write errors on broken stderr pipe
+  }
+}
+
+process.stdout.on("error", (err) => {
+  if (isBrokenPipeError(err)) process.exit(0);
+});
+process.stderr.on("error", (err) => {
+  if (isBrokenPipeError(err)) process.exit(0);
+});
+
 // A stray error from a forwarded socket or a channel must not kill the
-// process: every SSH session lives in it. Log and carry on.
+// process: every SSH session lives in it. Log and carry on, unless stdio pipe is broken.
 process.on("uncaughtException", (err) => {
-  console.error(`ssh-mcp: uncaught exception (kept running): ${err?.stack || err}`);
+  if (isBrokenPipeError(err)) {
+    process.exit(0);
+  }
+  safeStderrLog(`ssh-mcp: uncaught exception (kept running): ${err?.stack || err}`);
 });
 process.on("unhandledRejection", (reason) => {
-  console.error(`ssh-mcp: unhandled rejection (kept running): ${String(reason)}`);
+  if (isBrokenPipeError(reason)) {
+    process.exit(0);
+  }
+  safeStderrLog(`ssh-mcp: unhandled rejection (kept running): ${String(reason)}`);
 });
 
 // Cleanup on exit
