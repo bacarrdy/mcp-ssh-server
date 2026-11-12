@@ -353,11 +353,12 @@ User: "Create a VPS and install nginx on it"
 
 AI (using vpsnet-mcp):
 1. get_order_plans → pick a plan
-2. order_service → get VPS IP
+2. order_service (a quote first, then the confirmation after the user approves the price)
+3. get_service until the server is running → read its IP
 
 AI (using mcp-server-ssh):
-3. ssh_connect(host: "185.x.x.x", username: "root", password: "...")
-4. ssh_exec("apt update && apt install -y nginx")
+4. ssh_connect(host: "192.0.2.10", username: "root", password: "...")
+5. ssh_exec("apt update && apt install -y nginx")
 5. ssh_exec("systemctl enable --now nginx")
 ```
 
@@ -393,8 +394,8 @@ ssh_keygen(type: "ecdsa", bits: 256)
 
 - Verify the server is reachable: `ping <host>` or `telnet <host> 22`
 - Check if SSH port is open (default: 22)
-- For newly created VPS, wait 10-30 seconds for SSH daemon to start
-- Check firewall rules on the server
+- For a newly created server, first check with vpsnet-mcp `get_service` that it is running; boot time varies
+- Check the firewall rules inside the server and, on VPSnet, the server's public firewall
 
 ### Server drops every connection at once (fixed in 1.0.3)
 
