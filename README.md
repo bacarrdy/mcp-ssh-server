@@ -36,7 +36,7 @@ This server uses the [ssh2](https://github.com/mscdex/ssh2) library (pure JavaSc
 1. AI calls `ssh_connect` with host and credentials (key or password)
 2. Gets back a `connectionId` for all subsequent operations
 3. Runs commands with `ssh_exec`, transfers files with `sftp_*` tools
-4. Connection stays open until `ssh_disconnect` or 30 min idle timeout
+4. Connection stays open until `ssh_disconnect`, 30 min idle timeout, or the MCP client closes the server (every SSH session and forward ends with it)
 
 > **Important:** All commands executed via `ssh_exec` must be non-interactive. Do NOT run commands that require user input (e.g. `apt upgrade` without `-y`, interactive editors like `vim` or `nano`, `passwd` without piping input). Always use non-interactive flags: `apt install -y`, `DEBIAN_FRONTEND=noninteractive`, `yes |`, etc.
 

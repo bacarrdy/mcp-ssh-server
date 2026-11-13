@@ -28,7 +28,7 @@ const server = new McpServer(
       "## Connection Workflow",
       "1. Call ssh_connect with host, username, and auth credentials (privateKey, privateKeyPath, or password).",
       "2. You get back a connectionId — use it for all subsequent operations.",
-      "3. The connection stays open until you call ssh_disconnect, or it times out after 30 min idle.",
+      "3. The connection stays open until you call ssh_disconnect, it times out after 30 min idle, or this MCP session ends (all SSH connections and forwards close with it).",
       "4. Multiple connections can be open simultaneously to different servers.",
       "",
       "## Authentication (in order of preference)",
@@ -495,13 +495,18 @@ server.registerTool(
 
 async function main() {
   const transport = new StdioServerTransport();
+  // The parent (the MCP client) owns this process: when it closes stdio or goes
+  // away, exit, so the "exit" handler in ssh.ts ends every SSH session and
+  // forward at once instead of leaving them open until the idle timeout.
   transport.onclose = () => process.exit(0);
   process.stdin.on("end", () => process.exit(0));
   process.stdin.on("close", () => process.exit(0));
+  // Orphan check: the parent died without closing the pipes and the process
+  // was re-parented. Compare with the parent at start, not with PID 1, so a
+  // client that legitimately runs as PID 1 (a container's main process) works.
+  const parentAtStart = process.ppid;
   setInterval(() => {
-    if (process.ppid === 1) {
-      process.exit(0);
-    }
+    if (process.ppid !== parentAtStart) process.exit(0);
   }, 5000).unref();
   await server.connect(transport);
   console.error("SSH MCP server running");
